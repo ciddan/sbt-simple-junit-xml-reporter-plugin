@@ -54,10 +54,13 @@ class TestGroupXmlWriter(val name: String) {
 
   def write(path: String) {
 
+    // hack - split up total duration to "mock" test duration
+    val individualDuration = testEvents.head.duration / testEvents.map(_.testEvent.detail.size).sum
+
     val resultXml =
       <testSuite errors={errors.toString} failures={failures.toString} name={name} tests={tests.toString} time={testEvents.head.duration.toString} timestamp={new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ").format(new Date())}>
         <properties/>{for (e <- testEvents; t <- e.testEvent.detail) yield {
-        <testcase classname={name} name={t.testName()} time={"0"}>
+        <testcase classname={name} name={t.testName()} time={individualDuration.toString}>
           {t.result() match {
           case Result.Failure =>
             <failure message={t.error().getMessage} type={t.error().getClass.getName}>
