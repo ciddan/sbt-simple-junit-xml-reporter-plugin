@@ -2,6 +2,7 @@ package ca.seibelnet
 
 import sbt._
 import Keys._
+import collection.mutable
 
 /**
  * User: bseibel
@@ -17,29 +18,42 @@ object JUnitTestReporting extends Plugin {
 
 class JUnitTestListener(val targetPath: String) extends TestReportListener {
 
-  var currentOutput: Option[TestGroupXmlWriter] = None
+  val output = new mutable.HashMap[String, TestGroupXmlWriter]()
+  var currentName:String = null
+
+  var start = System.currentTimeMillis()
 
   def testEvent(event: TestEvent) {
-      currentOutput.foreach(_.addEvent(event))
+    val duration = System.currentTimeMillis() - start
+    getOutput(currentName).addEvent(event, duration)
+    start = System.currentTimeMillis()
   }
 
   def endGroup(name: String, result: TestResult.Value) {
-    flushOutput()
+    flushOutput(name)
   }
 
   def endGroup(name: String, t: Throwable) {
-    flushOutput()
+    flushOutput(name)
   }
 
   def startGroup(name: String) {
-    currentOutput = Some(TestGroupXmlWriter(name))
+    getOutput(name)
+    currentName = name
+    start = System.currentTimeMillis()
   }
 
-  private def flushOutput() {
+  private def getOutput(name: String): TestGroupXmlWriter = {
+    this.synchronized {
+      output.getOrElseUpdate(name, TestGroupXmlWriter(name))
+    }
+  }
+
+  private def flushOutput(name: String) {
     val file = new File(targetPath)
     file.mkdirs()
 
-    currentOutput.foreach(_.write(targetPath))
+    getOutput(name).write(targetPath)
   }
 
 }

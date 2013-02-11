@@ -32,11 +32,14 @@ class TestGroupXmlWriter(val name: String) {
   var skipped: Int = 0
 
   lazy val hostName = InetAddress.getLocalHost.getHostName
-  lazy val testEvents: ListBuffer[TestEvent] = new ListBuffer[TestEvent]
+
+  case class TestEventData(testEvent: TestEvent, duration: Long)
+
+  lazy val testEvents: ListBuffer[TestEventData] = new ListBuffer[TestEventData]
 
 
-  def addEvent(testEvent: TestEvent) {
-    testEvents += testEvent
+  def addEvent(testEvent: TestEvent, duration: Long) {
+    testEvents += TestEventData(testEvent, duration)
     for (e: Event <- testEvent.detail) {
       tests += 1
       e.result() match {
@@ -52,31 +55,32 @@ class TestGroupXmlWriter(val name: String) {
   def write(path: String) {
 
     val resultXml =
-      <testSuite errors={errors.toString} failures={failures.toString} name={name} tests={tests.toString} time={"0"} timestamp={new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ").format(new Date())}>
-          <properties/>
-        {
-          for (e <- testEvents; t <- e.detail) yield
-          {
-            <testcase classname={name} name={ t.testName() } time={"0"}>
-              {
-                t.result() match {
-                  case Result.Failure =>
-                    <failure message={t.error().getMessage} type={t.error().getClass.getName}>{t.error().getStackTrace.map { e => e.toString }.mkString("\n")}</failure>
-                  case Result.Error =>
-                    <error message={t.error().getMessage} type={t.error().getClass.getName}>{t.error().getStackTrace.map { e => e.toString }.mkString("\n")}</error>
-                  case Result.Skipped =>
-                    <skipped/>
-                  case _ => {}
-                }
-              }
-            </testcase>
-          }
-        }
-        <system-out></system-out>
+      <testSuite errors={errors.toString} failures={failures.toString} name={name} tests={tests.toString} time={testEvents.head.duration.toString} timestamp={new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ").format(new Date())}>
+        <properties/>{for (e <- testEvents; t <- e.testEvent.detail) yield {
+        <testcase classname={name} name={t.testName()} time={"0"}>
+          {t.result() match {
+          case Result.Failure =>
+            <failure message={t.error().getMessage} type={t.error().getClass.getName}>
+              {t.error().getStackTrace.map {
+              e => e.toString
+            }.mkString("\n")}
+            </failure>
+          case Result.Error =>
+            <error message={t.error().getMessage} type={t.error().getClass.getName}>
+              {t.error().getStackTrace.map {
+              e => e.toString
+            }.mkString("\n")}
+            </error>
+          case Result.Skipped =>
+              <skipped/>
+          case _ => {}
+        }}
+        </testcase>
+      }}<system-out></system-out>
         <system-err></system-err>
       </testSuite>
 
-    XML.save(path+name+".xml",resultXml,xmlDecl = true)
+    XML.save(path + name + ".xml", resultXml, xmlDecl = true)
 
   }
 
